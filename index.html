@@ -11,12 +11,41 @@
       margin: 0;
       font-family: Arial, sans-serif;
     }
+
     #map {
       height: 100%;
     }
+
+    #titleBar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #2c3e50;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 10px 15px;
+      z-index: 1100;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    #subtitleBar {
+      position: absolute;
+      top: 44px;
+      left: 0;
+      width: 100%;
+      background: #34495e;
+      color: #ecf0f1;
+      font-size: 14px;
+      padding: 6px 15px;
+      z-index: 1099;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
     #filterBox {
       position: absolute;
-      top: 10px;
+      top: 90px;
       left: 10px;
       z-index: 1000;
       background: white;
@@ -25,15 +54,43 @@
       box-shadow: 0 1px 5px rgba(0,0,0,0.3);
       font-size: 14px;
     }
+
     #filterBox label {
       margin-right: 6px;
     }
+
     #filterBox select {
       margin-right: 10px;
+    }
+
+    #hireButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1200;
+      background-color: gold;
+      color: black;
+      border: none;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 10px 14px;
+      border-radius: 30px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.4);
+      cursor: pointer;
+      animation: flash 1.2s infinite alternate;
+    }
+
+    @keyframes flash {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0.6; transform: scale(1.05); }
     }
   </style>
 </head>
 <body>
+  <div id="titleBar">Hamilton Bike Parking Map</div>
+  <div id="subtitleBar">Hi Julianna – I want a job doing this.. and 10k</div>
+  <button id="hireButton">⭐ Hire Me</button>
+
   <div id="filterBox">
     <label for="wardSelect">Ward:</label>
     <select id="wardSelect">
@@ -50,17 +107,20 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([43.2557, -79.8711], 13);
+    const map = L.map('map', {
+      zoomControl: false
+    }).setView([43.2557, -79.8711], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
 
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
     const bikeLayer = L.layerGroup().addTo(map);
     const wardLayer = L.layerGroup().addTo(map);
     let allBikeFeatures = [];
 
-    // Load ward polygons and set up ward filter
     fetch('/data/wards')
       .then(res => res.json())
       .then(geojson => {
@@ -78,7 +138,6 @@
           }
         }).addTo(wardLayer);
 
-        // Populate ward dropdown
         const wardSelect = document.getElementById('wardSelect');
         Array.from(wards).sort().forEach(ward => {
           const option = document.createElement('option');
@@ -88,13 +147,11 @@
         });
       });
 
-    // Load bike racks and set up both filters
     fetch('/data/bikes')
       .then(res => res.json())
       .then(geojson => {
         allBikeFeatures = geojson.features;
 
-        // Populate rack type dropdown
         const rackTypes = new Set();
         allBikeFeatures.forEach(f => rackTypes.add(f.properties.RACK_TYPE));
         const rackSelect = document.getElementById('rackSelect');
@@ -105,10 +162,8 @@
           rackSelect.appendChild(option);
         });
 
-        // Initial draw
         drawBikeRacks("All", "All");
 
-        // Attach filter listeners
         document.getElementById('wardSelect').addEventListener('change', () => {
           drawBikeRacks(
             document.getElementById('wardSelect').value,
@@ -147,12 +202,11 @@
       }).addTo(bikeLayer);
     }
 
-    // Layer control
     const overlays = {
       "Bike Parking": bikeLayer,
       "Ward Boundaries": wardLayer
     };
-    L.control.layers(null, overlays).addTo(map);
+    L.control.layers(null, overlays, { position: 'bottomright' }).addTo(map);
   </script>
 </body>
 </html>
