@@ -23,13 +23,25 @@
       padding: 8px;
       border-radius: 4px;
       box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+      font-size: 14px;
+    }
+    #filterBox label {
+      margin-right: 6px;
+    }
+    #filterBox select {
+      margin-right: 10px;
     }
   </style>
 </head>
 <body>
   <div id="filterBox">
-    <label for="wardSelect">Filter Racks by Ward:</label>
+    <label for="wardSelect">Ward:</label>
     <select id="wardSelect">
+      <option value="All">All</option>
+    </select>
+
+    <label for="rackSelect">Rack Type:</label>
+    <select id="rackSelect">
       <option value="All">All</option>
     </select>
   </div>
@@ -48,7 +60,7 @@
     const wardLayer = L.layerGroup().addTo(map);
     let allBikeFeatures = [];
 
-    // Load wards with counts
+    // Load ward polygons and set up ward filter
     fetch('/data/wards')
       .then(res => res.json())
       .then(geojson => {
@@ -66,35 +78,60 @@
           }
         }).addTo(wardLayer);
 
-        // Populate dropdown
-        const select = document.getElementById('wardSelect');
+        // Populate ward dropdown
+        const wardSelect = document.getElementById('wardSelect');
         Array.from(wards).sort().forEach(ward => {
           const option = document.createElement('option');
           option.value = ward;
           option.textContent = `Ward ${ward}`;
-          select.appendChild(option);
-        });
-
-        // Set up listener
-        select.addEventListener('change', () => {
-          drawBikeRacks(select.value);
+          wardSelect.appendChild(option);
         });
       });
 
-    // Load all bike racks and store
+    // Load bike racks and set up both filters
     fetch('/data/bikes')
       .then(res => res.json())
       .then(geojson => {
         allBikeFeatures = geojson.features;
-        drawBikeRacks("All");
+
+        // Populate rack type dropdown
+        const rackTypes = new Set();
+        allBikeFeatures.forEach(f => rackTypes.add(f.properties.RACK_TYPE));
+        const rackSelect = document.getElementById('rackSelect');
+        Array.from(rackTypes).sort().forEach(type => {
+          const option = document.createElement('option');
+          option.value = type;
+          option.textContent = type;
+          rackSelect.appendChild(option);
+        });
+
+        // Initial draw
+        drawBikeRacks("All", "All");
+
+        // Attach filter listeners
+        document.getElementById('wardSelect').addEventListener('change', () => {
+          drawBikeRacks(
+            document.getElementById('wardSelect').value,
+            document.getElementById('rackSelect').value
+          );
+        });
+
+        document.getElementById('rackSelect').addEventListener('change', () => {
+          drawBikeRacks(
+            document.getElementById('wardSelect').value,
+            document.getElementById('rackSelect').value
+          );
+        });
       });
 
-    // Draw filtered bike racks
-    function drawBikeRacks(ward) {
+    function drawBikeRacks(ward, rackType) {
       bikeLayer.clearLayers();
-      const filtered = ward === "All"
-        ? allBikeFeatures
-        : allBikeFeatures.filter(f => f.properties.WARD == ward);
+
+      const filtered = allBikeFeatures.filter(f => {
+        const wMatch = ward === "All" || f.properties.WARD == ward;
+        const rMatch = rackType === "All" || f.properties.RACK_TYPE === rackType;
+        return wMatch && rMatch;
+      });
 
       L.geoJSON({ type: "FeatureCollection", features: filtered }, {
         onEachFeature: function (feature, layer) {
@@ -110,7 +147,7 @@
       }).addTo(bikeLayer);
     }
 
-    // Add layer toggle if needed
+    // Layer control
     const overlays = {
       "Bike Parking": bikeLayer,
       "Ward Boundaries": wardLayer
