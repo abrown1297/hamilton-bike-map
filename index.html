@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hamilton Bike Parking Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 100%;
+    }
+    #filterBox {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 8px;
+      border-radius: 4px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="filterBox">
+    <label for="wardSelect">Filter Racks by Ward:</label>
+    <select id="wardSelect">
+      <option value="All">All</option>
+    </select>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([43.2557, -79.8711], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
+
+    const bikeLayer = L.layerGroup().addTo(map);
+    const wardLayer = L.layerGroup().addTo(map);
+    let allBikeFeatures = [];
+
+    // Load wards with counts
+    fetch('/data/wards')
+      .then(res => res.json())
+      .then(geojson => {
+        const wards = new Set();
+        L.geoJSON(geojson, {
+          style: {
+            color: 'blue',
+            weight: 1,
+            fillOpacity: 0.1
+          },
+          onEachFeature: function (feature, layer) {
+            const p = feature.properties;
+            layer.bindPopup(`<strong>Ward ${p.WARD}</strong><br>Bike Racks: ${p.BIKE_COUNT}`);
+            wards.add(p.WARD);
+          }
+        }).addTo(wardLayer);
+
+        // Populate dropdown
+        const select = document.getElementById('wardSelect');
+        Array.from(wards).sort().forEach(ward => {
+          const option = document.createElement('option');
+          option.value = ward;
+          option.textContent = `Ward ${ward}`;
+          select.appendChild(option);
+        });
+
+        // Set up listener
+        select.addEventListener('change', () => {
+          drawBikeRacks(select.value);
+        });
+      });
+
+    // Load all bike racks and store
+    fetch('/data/bikes')
+      .then(res => res.json())
+      .then(geojson => {
+        allBikeFeatures = geojson.features;
+        drawBikeRacks("All");
+      });
+
+    // Draw filtered bike racks
+    function drawBikeRacks(ward) {
+      bikeLayer.clearLayers();
+      const filtered = ward === "All"
+        ? allBikeFeatures
+        : allBikeFeatures.filter(f => f.properties.WARD == ward);
+
+      L.geoJSON({ type: "FeatureCollection", features: filtered }, {
+        onEachFeature: function (feature, layer) {
+          const p = feature.properties;
+          const popup = `
+            <strong>Location:</strong> ${p.LOCATION_NAME}<br>
+            <strong>Rack Type:</strong> ${p.RACK_TYPE}<br>
+            <strong>Capacity:</strong> ${p.TOTAL_CAPACITY}<br>
+            <strong>Ward:</strong> ${p.WARD}
+          `;
+          layer.bindPopup(popup);
+        }
+      }).addTo(bikeLayer);
+    }
+
+    // Add layer toggle if needed
+    const overlays = {
+      "Bike Parking": bikeLayer,
+      "Ward Boundaries": wardLayer
+    };
+    L.control.layers(null, overlays).addTo(map);
+  </script>
+</body>
+</html>

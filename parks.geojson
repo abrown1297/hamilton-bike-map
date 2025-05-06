@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Bayfront Park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.8711, 43.2557]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Gage Park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.8431, 43.2406]
+      }
+    }
+  ]
+}
