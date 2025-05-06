@@ -84,6 +84,20 @@
       0% { opacity: 1; transform: scale(1); }
       100% { opacity: 0.6; transform: scale(1.05); }
     }
+
+    #heatToggle {
+      position: absolute;
+      top: 140px;
+      left: 10px;
+      z-index: 1000;
+      padding: 6px 10px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      background: #3498db;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -103,23 +117,24 @@
     </select>
   </div>
 
+  <button id="heatToggle">Switch to Heatmap</button>
+
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
   <script>
-    const map = L.map('map', {
-      zoomControl: false
-    }).setView([43.2557, -79.8711], 13);
-
+    const map = L.map('map', { zoomControl: false }).setView([43.2557, -79.8711], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
-
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     const bikeLayer = L.layerGroup().addTo(map);
     const wardLayer = L.layerGroup().addTo(map);
     let allBikeFeatures = [];
+    let heatLayer = null;
+    let usingHeatmap = false;
 
     fetch('/data/wards')
       .then(res => res.json())
@@ -180,6 +195,10 @@
       });
 
     function drawBikeRacks(ward, rackType) {
+      if (heatLayer) {
+        map.removeLayer(heatLayer);
+        heatLayer = null;
+      }
       bikeLayer.clearLayers();
 
       const filtered = allBikeFeatures.filter(f => {
@@ -188,19 +207,39 @@
         return wMatch && rMatch;
       });
 
-      L.geoJSON({ type: "FeatureCollection", features: filtered }, {
-        onEachFeature: function (feature, layer) {
-          const p = feature.properties;
-          const popup = `
-            <strong>Location:</strong> ${p.LOCATION_NAME}<br>
-            <strong>Rack Type:</strong> ${p.RACK_TYPE}<br>
-            <strong>Capacity:</strong> ${p.TOTAL_CAPACITY}<br>
-            <strong>Ward:</strong> ${p.WARD}
-          `;
-          layer.bindPopup(popup);
-        }
-      }).addTo(bikeLayer);
+      if (!usingHeatmap) {
+        L.geoJSON({ type: "FeatureCollection", features: filtered }, {
+          onEachFeature: function (feature, layer) {
+            const p = feature.properties;
+            const popup = `
+              <strong>Location:</strong> ${p.LOCATION_NAME}<br>
+              <strong>Rack Type:</strong> ${p.RACK_TYPE}<br>
+              <strong>Capacity:</strong> ${p.TOTAL_CAPACITY}<br>
+              <strong>Ward:</strong> ${p.WARD}
+            `;
+            layer.bindPopup(popup);
+          }
+        }).addTo(bikeLayer);
+      } else {
+        const points = filtered.map(f => [
+          f.geometry.coordinates[1],
+          f.geometry.coordinates[0],
+          f.properties.TOTAL_CAPACITY || 1
+        ]);
+        heatLayer = L.heatLayer(points, { radius: 20, blur: 15 }).addTo(map);
+      }
     }
+
+    document.getElementById('heatToggle').addEventListener('click', () => {
+      usingHeatmap = !usingHeatmap;
+      drawBikeRacks(
+        document.getElementById('wardSelect').value,
+        document.getElementById('rackSelect').value
+      );
+      document.getElementById('heatToggle').textContent = usingHeatmap
+        ? "Switch to Markers"
+        : "Switch to Heatmap";
+    });
 
     const overlays = {
       "Bike Parking": bikeLayer,
