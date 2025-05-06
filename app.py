@@ -18,4 +18,4 @@ def get_wards():
     return send_from_directory('.', 'wards_with_counts.geojson')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=10000)
